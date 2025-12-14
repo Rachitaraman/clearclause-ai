@@ -1,0 +1,333 @@
+/* Professional Card System */
+.card {
+  background: white;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--gray-200);
+  box-shadow: var(--shadow-sm);
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+
+.card:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--gray-300);
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-6) var(--space-6) 0;
+  margin-bottom: var(--space-6);
+}
+
+.card-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--gray-900);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.card-title-icon {
+  font-size: 20px;
+}
+
+.card-content {
+  padding: 0 var(--space-6) var(--space-6);
+  color: var(--gray-700);
+  line-height: 1.6;
+}
+
+.card-full-padding {
+  padding: var(--space-6);
+}
+
+/* Professional Stat Cards */
+.stat-card {
+  background: white;
+  border-radius: var(--radius-xl);
+  padding: var(--space-8);
+  border: 1px solid var(--gray-200);
+  box-shadow: var(--shadow-sm);
+  text-align: center;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--gradient-primary);
+}
+
+.stat-card:hover {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+  border-color: var(--primary);
+}
+
+.stat-number {
+  font-size: 48px;
+  font-weight: 800;
+  color: var(--primary);
+  margin-bottom: var(--space-2);
+  line-height: 1;
+}
+
+.stat-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gray-600);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.stat-description {
+  font-size: 13px;
+  color: var(--gray-500);
+  margin-top: var(--space-2);
+}
+
+/* Professional Alert Cards */
+.alert {
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  border: 1px solid;
+  margin-bottom: var(--space-4);
+}
+
+.alert-success {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #166534;
+}
+
+.alert-warning {
+  background: #fffbeb;
+  border-color: #fed7aa;
+  color: #92400e;
+}
+
+.alert-error {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #991b1b;
+}
+
+.alert-info {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1e40af;
+}
+
+/* Professional Progress Cards */
+.progress-card {
+  background: white;
+  border-radius: var(--radius-xl);
+  padding: var(--space-8);
+  border: 1px solid var(--gray-200);
+  box-shadow: var(--shadow-sm);
+  margin-bottom: var(--space-6);
+}
+
+.progress-header {
+  text-align: center;
+  margin-bottom: var(--space-8);
+}
+
+.progress-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--gray-900);
+  margin-bottom: var(--space-2);
+}
+
+.progress-subtitle {
+  color: var(--gray-600);
+  font-size: 16px;
+}
+
+.progress-steps {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-8);
+  position: relative;
+}
+
+.progress-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  position: relative;
+  z-index: 2;
+}
+
+.progress-step-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: var(--space-3);
+  transition: all 0.3s ease;
+  border: 3px solid;
+}
+
+.progress-step.active .progress-step-icon {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgb(37 99 235 / 0.1);
+}
+
+.progress-step.completed .progress-step-icon {
+  background: var(--accent-emerald);
+  color: white;
+  border-color: var(--accent-emerald);
+}
+
+.progress-step.pending .progress-step-icon {
+  background: var(--gray-100);
+  color: var(--gray-400);
+  border-color: var(--gray-300);
+}
+
+.progress-step-label {
+  font-weight: 600;
+  color: var(--gray-700);
+  text-align: center;
+  font-size: 14px;
+}
+
+.progress-step-description {
+  font-size: 12px;
+  color: var(--gray-500);
+  text-align: center;
+  margin-top: var(--space-1);
+}
+
+.progress-connector {
+  position: absolute;
+  top: 28px;
+  left: 15%;
+  right: 15%;
+  height: 2px;
+  background: var(--gray-200);
+  z-index: 1;
+}
+
+.progress-connector-fill {
+  height: 100%;
+  background: var(--primary);
+  transition: width 0.5s ease;
+  border-radius: 1px;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 8px;
+  background: var(--gray-200);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: var(--gradient-primary);
+  transition: width 0.5s ease;
+  border-radius: var(--radius-full);
+}
+
+/* Professional Data Cards */
+.data-card {
+  background: white;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--gray-200);
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.data-card:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--gray-300);
+}
+
+.data-card-header {
+  padding: var(--space-4) var(--space-6);
+  border-bottom: 1px solid var(--gray-200);
+  background: var(--gray-50);
+}
+
+.data-card-title {
+  font-weight: 600;
+  color: var(--gray-900);
+  margin: 0;
+}
+
+.data-card-content {
+  padding: var(--space-6);
+}
+
+/* Professional List Cards */
+.list-card {
+  background: white;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--gray-200);
+  overflow: hidden;
+}
+
+.list-item {
+  padding: var(--space-4) var(--space-6);
+  border-bottom: 1px solid var(--gray-100);
+  transition: background-color 0.2s ease;
+}
+
+.list-item:last-child {
+  border-bottom: none;
+}
+
+.list-item:hover {
+  background: var(--gray-50);
+}
+
+.list-item-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.list-item-main {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.list-item-icon {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
+}
+
+.list-item-text {
+  color: var(--gray-700);
+  font-weight: 500;
+}
+
+.list-item-meta {
+  font-size: 12px;
+  color: var(--gray-500);
+}
