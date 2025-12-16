@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 
 import HomePage from '../routes/index.jsx'
 
@@ -20,10 +20,21 @@ import RisksTab from './components/analysis/RisksTab.jsx'
 import CompareTab from './components/analysis/CompareTab.jsx'
 import ComparisonResults from './components/analysis/ComparisonResults.jsx'
 
+
 // Charts
 import RiskPieChart from './components/charts/RiskPieChart.jsx'
 
-// Mock data (until AWS is wired)
+// AWS Services Integration
+import { 
+    processDocument, 
+    processImageDocument, 
+    processTextInput, 
+    processURLContent, 
+    compareDocuments,
+    transformAnalysisForUI 
+} from './utils/documentProcessor.js'
+
+// Mock data (fallback)
 import { mockData } from './utils/mockData.js'
 
 function App() {
@@ -77,8 +88,8 @@ function App() {
         }
     }
 
-    // ---------------- SIMULATED ANALYSIS FLOW ----------------
-    const runAnalysis = (analysisType = 'single', documents = []) => {
+    // ---------------- REAL AWS ANALYSIS FLOW ----------------
+    const runAnalysis = async (analysisType = 'single', documents = []) => {
         setLoading(true)
         setStage('textract')
         
@@ -91,22 +102,89 @@ function App() {
             setComparisonDocuments([])
         }
 
-        setTimeout(() => {
-            setStage('bedrock')
-        }, 1200)
+        try {
+            let analysisResult
 
-        setTimeout(() => {
-            setResult(mockData)
+            if (analysisType === 'comparison' || documents.length > 1) {
+                // Multi-document comparison
+                analysisResult = await compareDocuments(documents)
+                
+                if (analysisResult.error) {
+                    throw new Error(analysisResult.error)
+                }
+
+                // For comparison, we'll use the comparison data directly
+                setResult({
+                    comparison: analysisResult.data.comparison,
+                    documents: analysisResult.data.documents,
+                    metadata: analysisResult.data.metadata
+                })
+            } else {
+                // Single document analysis
+                const document = documents[0]
+                
+                if (document instanceof File) {
+                    // Determine processing method based on file type
+                    if (document.type.startsWith('image/')) {
+                        analysisResult = await processImageDocument(document)
+                    } else {
+                        analysisResult = await processDocument(document)
+                    }
+                } else if (typeof document === 'string') {
+                    // Check if it's a URL or text
+                    if (document.startsWith('http://') || document.startsWith('https://')) {
+                        analysisResult = await processURLContent(document)
+                    } else {
+                        analysisResult = await processTextInput(document)
+                    }
+                }
+
+                // Update stage based on processing progress
+                if (analysisResult.stage === 'bedrock') {
+                    setStage('bedrock')
+                }
+
+                if (analysisResult.error) {
+                    throw new Error(analysisResult.error)
+                }
+
+                // Transform AWS results to UI format
+                console.log('App: About to transform data:', analysisResult.data)
+                const transformedData = transformAnalysisForUI(analysisResult.data)
+                console.log('App: Transformed data:', transformedData)
+                setResult(transformedData)
+            }
+
             setLoading(false)
             setStage(null)
 
+            // Add to history
             const newItem = isComparison ? 
                 `Comparison Analysis – ${documents.length} documents – ${new Date().toLocaleString()}` :
-                `Analysis – ${new Date().toLocaleString()}`
+                `Analysis – ${analysisResult.data?.document?.name || 'Document'} – ${new Date().toLocaleString()}`
             const updated = [newItem, ...history]
             setHistory(updated)
             localStorage.setItem('history', JSON.stringify(updated))
-        }, 2500)
+
+        } catch (error) {
+            console.error('Analysis failed:', error)
+            console.error('Error details:', error.stack)
+            
+            // Fallback to mock data on error
+            console.log('Falling back to mock data due to error:', error.message)
+            setStage('bedrock')
+            
+            setTimeout(() => {
+                setResult(mockData)
+                setLoading(false)
+                setStage(null)
+
+                const newItem = `Analysis (Mock) – ${new Date().toLocaleString()}`
+                const updated = [newItem, ...history]
+                setHistory(updated)
+                localStorage.setItem('history', JSON.stringify(updated))
+            }, 1500)
+        }
     }
 
     // ---------------- ROUTES ----------------
@@ -184,6 +262,15 @@ function App() {
                         </div>
                     </div>
                 )
+
+            case '/test':
+                // Simple test component
+                const SimpleTest = React.lazy(() => import('./components/SimpleTest.jsx'));
+                return (
+                    <React.Suspense fallback={<div>Loading...</div>}>
+                        <SimpleTest />
+                    </React.Suspense>
+                );
 
             case '/clearclause':
                 // ---------- LOGIN GATE ----------

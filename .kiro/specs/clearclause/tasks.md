@@ -168,12 +168,14 @@
 
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 8. Implement frontend-to-backend connectivity testing
+- [x] 8. Implement frontend-to-backend connectivity testing
 
 
 
 
-- [ ] 8.1 Create ClearClause test page with connectivity functionality
+
+- [x] 8.1 Create ClearClause test page with connectivity functionality
+
 
 
   - Create routes/clearclause/index.jsx with "Test Backend" button
@@ -209,7 +211,13 @@
   - Test response handling and display
   - _Requirements: 6.1, 6.2, 6.4_
 
+
 - [ ] 9. Verify connectivity testing integration
+
+
+
+
+
 
 
 
@@ -219,8 +227,11 @@
 
   - Start the application and navigate to /clearclause
   - Verify "Test Backend" button functionality
+
+
   - Confirm POST request to /api/process works
   - Validate response display shows connectivity confirmation
+
   - _Requirements: 6.1, 6.2, 6.3, 6.4_
 
 - [ ] 10. Final connectivity checkpoint
