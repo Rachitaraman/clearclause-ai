@@ -1,18 +1,18 @@
 # 🚀 New Features Added to ClearClause AI
 
-## ✅ **Excel File Upload Support**
+## ✅ **Document Upload Support**
 
-### **New Excel Tab**
-- Added dedicated **📊 Excel Files** tab in document upload interface
-- Supports multiple Excel formats: **XLSX, XLS, CSV, ODS**
-- Professional upload interface with drag-and-drop functionality
-- Smart preview showing Excel file details and analysis capabilities
+### **Document Input Methods**
+- **📄 Documents**: PDF, DOC, DOCX, TXT files with drag-and-drop functionality
+- **🖼️ Images**: Image upload with OCR support for scanned documents
+- **📝 Text Input**: Direct text input with character/word count
+- **🔗 URL Input**: Web scraping for online documents and terms of service
 
-### **Excel Analysis Features**
-- **Data Extraction**: AI analyzes spreadsheet data and extracts contract terms
-- **Term Analysis**: Identifies key legal information within Excel data
-- **Risk Assessment**: Evaluates risks based on spreadsheet content
-- **Contract Data Processing**: Handles contract lists, terms tables, and legal information
+### **Document Analysis Features**
+- **Text Extraction**: AI analyzes document content and extracts contract terms
+- **Term Analysis**: Identifies key legal information within documents
+- **Risk Assessment**: Evaluates risks based on document content
+- **Contract Processing**: Handles various legal document formats and structures
 
 ---
 
@@ -65,13 +65,12 @@ Created new `ComparisonResults.jsx` component with three main views:
 ## 🎨 **Enhanced User Interface**
 
 ### **Improved Tab Navigation**
-- Redesigned tab layout with **6 input methods**:
-  1. 📄 Documents (PDF, DOCX, TXT, RTF)
-  2. 📊 Excel Files (XLSX, XLS, CSV, ODS)
-  3. ⚖️ Compare Docs (Multiple files)
-  4. 🖼️ Images (JPG, PNG, GIF, WEBP)
-  5. 📝 Text Input (Direct typing)
-  6. 🔗 URL Input (Web scraping)
+- Redesigned tab layout with **5 input methods**:
+  1. 📄 Documents (PDF, DOCX, TXT)
+  2. ⚖️ Compare Docs (Multiple files)
+  3. 🖼️ Images (JPG, PNG, GIF, WEBP)
+  4. 📝 Text Input (Direct typing)
+  5. 🔗 URL Input (Web scraping)
 
 ### **Smart Preview System**
 - **Context-aware previews** for each file type
@@ -111,7 +110,7 @@ Created new `ComparisonResults.jsx` component with three main views:
 ## 📋 **Key Benefits**
 
 ### **For Users**
-- ✅ **Excel support** for contract data analysis
+- ✅ **Document support** for comprehensive contract analysis
 - ✅ **Multi-document comparison** with tabulated results
 - ✅ **Professional comparison tables** for easy analysis
 - ✅ **Risk assessment** across multiple documents
@@ -128,11 +127,11 @@ Created new `ComparisonResults.jsx` component with three main views:
 
 ## 🚀 **Usage Instructions**
 
-### **Excel File Analysis**
-1. Click the **📊 Excel Files** tab
-2. Upload your Excel file (XLSX, XLS, CSV, ODS)
+### **Document Analysis**
+1. Click the **📄 Documents** tab
+2. Upload your document file (PDF, DOCX, TXT)
 3. Click **🚀 Analyze with AI**
-4. Get data extraction and risk assessment results
+4. Get comprehensive analysis and risk assessment results
 
 ### **Multi-Document Comparison**
 1. Click the **⚖️ Compare Docs** tab
@@ -156,3 +155,8 @@ Perfect for showcasing to judges and stakeholders:
 - **Real-time analysis** with progress indicators
 
 **Status: ✅ Complete and Ready for Demo**
+
+
+
+
+

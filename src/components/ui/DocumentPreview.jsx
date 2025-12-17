@@ -3,11 +3,10 @@ import '../../styles/theme.css'
 import '../../styles/animations.css'
 
 const DocumentPreview = ({ onAnalyze }) => {
-  const [activeTab, setActiveTab] = useState('file') // file, image, text, url, excel, multi
+  const [activeTab, setActiveTab] = useState('file') // file, image, text, url, multi
   const [isDragOver, setIsDragOver] = useState(false)
   const [selectedFile, setSelectedFile] = useState(null)
   const [selectedImage, setSelectedImage] = useState(null)
-  const [selectedExcel, setSelectedExcel] = useState(null)
   const [multipleFiles, setMultipleFiles] = useState([])
   const [textInput, setTextInput] = useState('')
   const [urlInput, setUrlInput] = useState('')
@@ -50,13 +49,6 @@ const DocumentPreview = ({ onAnalyze }) => {
     setPreviewMode('preview')
   }
 
-  const handleExcelSelect = (file) => {
-    setSelectedExcel(file)
-    setCurrentContent(file)
-    setCurrentType('excel')
-    setPreviewMode('preview')
-  }
-
   const handleMultipleFilesSelect = (files) => {
     const fileArray = Array.from(files)
     setMultipleFiles(fileArray)
@@ -64,6 +56,8 @@ const DocumentPreview = ({ onAnalyze }) => {
     setCurrentType('multi')
     setPreviewMode('preview')
   }
+
+
 
   const handleTextSubmit = () => {
     if (textInput.trim()) {
@@ -106,7 +100,7 @@ const DocumentPreview = ({ onAnalyze }) => {
       const files = e.target.files
       if (files && files.length > 0) {
         // Validate all files for multi-document upload
-        const expectedFormats = ['pdf', 'doc', 'docx', 'txt', 'xlsx', 'xls', 'csv']
+        const expectedFormats = ['pdf', 'doc', 'docx', 'txt']
         const invalidFiles = []
         
         Array.from(files).forEach(file => {
@@ -132,15 +126,11 @@ const DocumentPreview = ({ onAnalyze }) => {
         // Define expected formats for each tab
         switch (activeTab) {
           case 'file':
-            expectedFormats = ['pdf', 'doc', 'docx', 'txt', 'xlsx', 'xls', 'csv']
+            expectedFormats = ['pdf', 'doc', 'docx', 'txt']
             isValid = validateFileFormat(file, expectedFormats)
             break
           case 'image':
             expectedFormats = ['jpg', 'jpeg', 'png', 'gif', 'webp']
-            isValid = validateFileFormat(file, expectedFormats)
-            break
-          case 'excel':
-            expectedFormats = ['xlsx', 'xls', 'csv', 'ods']
             isValid = validateFileFormat(file, expectedFormats)
             break
           default:
@@ -157,8 +147,6 @@ const DocumentPreview = ({ onAnalyze }) => {
         // Process valid file
         if (activeTab === 'image') {
           handleImageSelect(file)
-        } else if (activeTab === 'excel') {
-          handleExcelSelect(file)
         } else {
           handleFileSelect(file)
         }
@@ -183,7 +171,6 @@ const DocumentPreview = ({ onAnalyze }) => {
     setCurrentType(null)
     setSelectedFile(null)
     setSelectedImage(null)
-    setSelectedExcel(null)
     setMultipleFiles([])
     setTextInput('')
     setUrlInput('')
@@ -222,10 +209,9 @@ The Company reserves the right to modify or replace these Terms at any time.
     }}>
       {[
         { id: 'file', label: 'Documents', icon: '📄', color: 'var(--gradient-primary)' },
-        { id: 'excel', label: 'Excel Files', icon: '�', color: 'var(--gradient-success)' },
         { id: 'multi', label: 'Compare Docs', icon: '⚖️', color: 'var(--gradient-info)' },
         { id: 'image', label: 'Images', icon: '🖼️', color: 'var(--gradient-emerald)' },
-        { id: 'text', label: 'Text Input', icon: '📝', color: 'var(--gradient-purple)' },
+        { id: 'text', label: 'Text Input', icon: '� ', color: 'var(--gradient-purple)' },
         { id: 'url', label: 'URL Input', icon: '🔗', color: 'var(--gradient-orange)' }
       ].map((tab) => (
         <button
@@ -329,7 +315,7 @@ The Company reserves the right to modify or replace these Terms at any time.
           marginBottom: 'var(--space-6)',
           lineHeight: 1.6
         }}>
-          Drag and drop your PDF, Word, Excel, or text file here, or click to browse
+          Drag and drop your PDF, Word, or text file here, or click to browse
         </p>
 
         <div style={{
@@ -339,7 +325,7 @@ The Company reserves the right to modify or replace these Terms at any time.
           flexWrap: 'wrap',
           marginBottom: 'var(--space-6)'
         }}>
-          {(activeTab === 'excel' ? ['XLSX', 'XLS', 'CSV', 'ODS'] : ['PDF', 'DOCX', 'TXT', 'XLSX', 'XLS', 'CSV']).map((format) => (
+          {['PDF', 'DOCX', 'TXT'].map((format) => (
             <span
               key={format}
               style={{
@@ -369,9 +355,8 @@ The Company reserves the right to modify or replace these Terms at any time.
           type="file"
           accept={
             activeTab === 'image' ? 'image/*' : 
-            activeTab === 'excel' ? '.xlsx,.xls,.csv,.ods' :
-            activeTab === 'multi' ? '.pdf,.doc,.docx,.txt,.xlsx,.xls,.csv' :
-            '.pdf,.doc,.docx,.txt,.xlsx,.xls,.csv'
+            activeTab === 'multi' ? '.pdf,.doc,.docx,.txt' :
+            '.pdf,.doc,.docx,.txt'
           }
           multiple={activeTab === 'multi'}
           onChange={handleFileInput}
@@ -586,98 +571,9 @@ By accessing and using this service, you accept and agree to be bound by the ter
     </div>
   )
 
-  const renderExcelUpload = () => (
-    <div
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-      style={{
-        border: `3px dashed ${isDragOver ? 'var(--accent-emerald)' : 'var(--gray-300)'}`,
-        borderRadius: 'var(--radius-2xl)',
-        padding: 'var(--space-12)',
-        textAlign: 'center',
-        background: isDragOver ? 'rgba(16, 185, 129, 0.1)' : 'var(--gray-50)',
-        transition: 'all var(--duration-300) var(--ease-out)',
-        cursor: 'pointer',
-        position: 'relative',
-        overflow: 'hidden'
-      }}
-      onClick={() => document.getElementById(`${activeTab}-input`).click()}
-    >
-      <div style={{ position: 'relative', zIndex: 1 }}>
-        <div style={{
-          width: '80px',
-          height: '80px',
-          background: isDragOver ? 'var(--gradient-success)' : 'var(--gradient-success)',
-          borderRadius: 'var(--radius-2xl)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          margin: '0 auto var(--space-6)',
-          fontSize: '32px',
-          color: 'white',
-          animation: isDragOver ? 'bounce 1s ease-in-out infinite' : 'none'
-        }}>
-          📊
-        </div>
 
-        <h3 style={{
-          fontSize: '24px',
-          fontWeight: '700',
-          color: 'var(--gray-900)',
-          marginBottom: 'var(--space-3)'
-        }}>
-          {isDragOver ? 'Drop your Excel file here!' : 'Upload Excel Document'}
-        </h3>
 
-        <p style={{
-          fontSize: '16px',
-          color: 'var(--gray-600)',
-          marginBottom: 'var(--space-6)',
-          lineHeight: 1.6
-        }}>
-          Upload Excel files with contract data, terms lists, or legal information
-        </p>
 
-        <div style={{
-          display: 'flex',
-          justifyContent: 'center',
-          gap: 'var(--space-4)',
-          flexWrap: 'wrap',
-          marginBottom: 'var(--space-6)'
-        }}>
-          {['XLSX', 'XLS', 'CSV', 'ODS'].map((format) => (
-            <span
-              key={format}
-              style={{
-                padding: 'var(--space-2) var(--space-3)',
-                background: 'white',
-                border: '1px solid var(--gray-300)',
-                borderRadius: 'var(--radius)',
-                fontSize: '12px',
-                fontWeight: '600',
-                color: 'var(--gray-600)'
-              }}
-            >
-              {format}
-            </span>
-          ))}
-        </div>
-
-        <button className="btn btn-success btn-lg" style={{ pointerEvents: 'none' }}>
-          Choose Excel File
-        </button>
-
-        <input
-          id={`${activeTab}-input`}
-          type="file"
-          accept=".xlsx,.xls,.csv,.ods"
-          onChange={handleFileInput}
-          style={{ display: 'none' }}
-        />
-      </div>
-    </div>
-  )
 
   const renderMultiDocumentUpload = () => (
     <div
@@ -777,7 +673,7 @@ By accessing and using this service, you accept and agree to be bound by the ter
         <input
           id={`${activeTab}-input`}
           type="file"
-          accept=".pdf,.doc,.docx,.txt,.xlsx,.xls,.csv"
+          accept=".pdf,.doc,.docx,.txt"
           multiple
           onChange={handleFileInput}
           style={{ display: 'none' }}
@@ -925,8 +821,6 @@ By accessing and using this service, you accept and agree to be bound by the ter
     switch (activeTab) {
       case 'image':
         return renderImageUpload()
-      case 'excel':
-        return renderExcelUpload()
       case 'multi':
         return renderMultiDocumentUpload()
       case 'text':
@@ -941,18 +835,16 @@ By accessing and using this service, you accept and agree to be bound by the ter
   const getPreviewIcon = () => {
     switch (currentType) {
       case 'image': return '🖼️'
-      case 'excel': return '�'
       case 'multi': return '⚖️'
       case 'text': return '📝'
       case 'url': return '🔗'
-      default: return '📄'
+      default: return '�'
     }
   }
 
   const getPreviewColor = () => {
     switch (currentType) {
       case 'image': return 'var(--gradient-emerald)'
-      case 'excel': return 'var(--gradient-success)'
       case 'multi': return 'var(--gradient-info)'
       case 'text': return 'var(--gradient-purple)'
       case 'url': return 'var(--gradient-orange)'
@@ -963,7 +855,6 @@ By accessing and using this service, you accept and agree to be bound by the ter
   const getPreviewTitle = () => {
     switch (currentType) {
       case 'image': return selectedImage?.name || 'document-image.jpg'
-      case 'excel': return selectedExcel?.name || 'contract-data.xlsx'
       case 'multi': return `${multipleFiles.length} Documents for Comparison`
       case 'text': return 'Text Document'
       case 'url': return new URL(currentContent).hostname
@@ -974,7 +865,6 @@ By accessing and using this service, you accept and agree to be bound by the ter
   const getPreviewSubtitle = () => {
     switch (currentType) {
       case 'image': return selectedImage ? `${(selectedImage.size / 1024).toFixed(1)} KB • Image ready for OCR analysis` : 'Image ready for OCR analysis'
-      case 'excel': return selectedExcel ? `${(selectedExcel.size / 1024).toFixed(1)} KB • Excel ready for data analysis` : 'Excel ready for data analysis'
       case 'multi': return `${multipleFiles.length} files • Ready for comparative analysis`
       case 'text': return `${currentContent.length} characters • ${currentContent.trim().split(/\s+/).length} words`
       case 'url': return `URL • Ready for web scraping analysis`
@@ -1059,53 +949,7 @@ By accessing and using this service, you accept and agree to be bound by the ter
         color: 'var(--gray-700)',
         background: 'var(--gray-50)'
       }}>
-        {currentType === 'excel' ? (
-          <div style={{
-            textAlign: 'center',
-            padding: 'var(--space-8)'
-          }}>
-            <div style={{
-              width: '120px',
-              height: '120px',
-              background: 'var(--gradient-success)',
-              borderRadius: 'var(--radius-2xl)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto var(--space-4)',
-              fontSize: '48px',
-              color: 'white'
-            }}>
-              📊
-            </div>
-            <h4 style={{
-              fontSize: '18px',
-              fontWeight: '600',
-              color: 'var(--gray-900)',
-              marginBottom: 'var(--space-2)'
-            }}>
-              Excel File Ready for Analysis
-            </h4>
-            <p style={{
-              color: 'var(--gray-600)',
-              marginBottom: 'var(--space-4)'
-            }}>
-              Our AI will analyze spreadsheet data, extract contract terms, and identify key information
-            </p>
-            <div style={{
-              display: 'flex',
-              justifyContent: 'center',
-              gap: 'var(--space-4)',
-              flexWrap: 'wrap',
-              fontSize: '13px',
-              color: 'var(--gray-500)'
-            }}>
-              <span>✓ Data Extraction</span>
-              <span>✓ Term Analysis</span>
-              <span>✓ Risk Assessment</span>
-            </div>
-          </div>
-        ) : currentType === 'multi' ? (
+        {currentType === 'multi' ? (
           <div style={{
             padding: 'var(--space-4)'
           }}>
@@ -1380,7 +1224,6 @@ By accessing and using this service, you accept and agree to be bound by the ter
         >
           Choose Different {
             currentType === 'image' ? 'Image' : 
-            currentType === 'excel' ? 'Excel File' :
             currentType === 'multi' ? 'Documents' :
             currentType === 'text' ? 'Text' : 
             currentType === 'url' ? 'URL' : 'File'
@@ -1430,7 +1273,7 @@ By accessing and using this service, you accept and agree to be bound by the ter
           maxWidth: '700px',
           margin: '0 auto'
         }}>
-          Upload documents, Excel files, or compare multiple files to get instant AI-powered analysis. 
+          Upload documents, compare multiple files, or enter text/URLs to get instant AI-powered analysis. 
           Identify risks, simplify complex clauses, and get tabulated comparison results in real-time.
         </p>
       </div>
