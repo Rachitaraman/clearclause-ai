@@ -12,6 +12,7 @@ import HistoryPanel from './components/history/HistoryPanel.jsx'
 import AIConfidenceMeter from './components/ui/AIConfidenceMeter.jsx'
 import DocumentPreview from './components/ui/DocumentPreview.jsx'
 import UserProfile from './components/profile/UserProfile.jsx'
+import AnalysisSourceIndicator from './components/ui/AnalysisSourceIndicator.jsx'
 
 // Analysis Tabs
 import SummaryTab from './components/analysis/SummaryTab.jsx'
@@ -20,11 +21,10 @@ import RisksTab from './components/analysis/RisksTab.jsx'
 import CompareTab from './components/analysis/CompareTab.jsx'
 import ComparisonResults from './components/analysis/ComparisonResults.jsx'
 
-
 // Charts
 import RiskPieChart from './components/charts/RiskPieChart.jsx'
 
-// AWS Services Integration
+// Client-side document processing (fixed to avoid server imports)
 import { 
     processDocument, 
     processImageDocument, 
@@ -88,7 +88,7 @@ function App() {
         }
     }
 
-    // ---------------- REAL AWS ANALYSIS FLOW ----------------
+    // ---------------- ANALYSIS FLOW (CLIENT-SIDE ONLY) ----------------
     const runAnalysis = async (analysisType = 'single', documents = []) => {
         setLoading(true)
         setStage('textract')
@@ -148,7 +148,7 @@ function App() {
                     throw new Error(analysisResult.error)
                 }
 
-                // Transform AWS results to UI format
+                // Transform results to UI format
                 console.log('App: About to transform data:', analysisResult.data)
                 const transformedData = transformAnalysisForUI(analysisResult.data)
                 console.log('App: Transformed data:', transformedData)
@@ -302,7 +302,13 @@ function App() {
 
                             {/* Show final confidence when complete */}
                             {result && !loading && (
-                                <AIConfidenceMeter confidence={97} />
+                                <>
+                                    <AIConfidenceMeter confidence={97} />
+                                    <AnalysisSourceIndicator 
+                                        metadata={result.metadata} 
+                                        errorDetails={result.errorDetails}
+                                    />
+                                </>
                             )}
 
                             {/* RESULTS */}

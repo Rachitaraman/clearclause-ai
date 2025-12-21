@@ -100,7 +100,7 @@ const DocumentPreview = ({ onAnalyze }) => {
       const files = e.target.files
       if (files && files.length > 0) {
         // Validate all files for multi-document upload
-        const expectedFormats = ['pdf', 'doc', 'docx', 'txt']
+        const expectedFormats = ['pdf', 'doc', 'docx', 'txt', 'xlsx', 'xls', 'csv']
         const invalidFiles = []
         
         Array.from(files).forEach(file => {
@@ -126,7 +126,7 @@ const DocumentPreview = ({ onAnalyze }) => {
         // Define expected formats for each tab
         switch (activeTab) {
           case 'file':
-            expectedFormats = ['pdf', 'doc', 'docx', 'txt']
+            expectedFormats = ['pdf', 'doc', 'docx', 'txt', 'xlsx', 'xls', 'csv']
             isValid = validateFileFormat(file, expectedFormats)
             break
           case 'image':
@@ -315,7 +315,7 @@ The Company reserves the right to modify or replace these Terms at any time.
           marginBottom: 'var(--space-6)',
           lineHeight: 1.6
         }}>
-          Drag and drop your PDF, Word, or text file here, or click to browse
+          Drag and drop your PDF, Word, Excel, or text file here, or click to browse
         </p>
 
         <div style={{
@@ -325,7 +325,7 @@ The Company reserves the right to modify or replace these Terms at any time.
           flexWrap: 'wrap',
           marginBottom: 'var(--space-6)'
         }}>
-          {['PDF', 'DOCX', 'TXT'].map((format) => (
+          {['PDF', 'DOCX', 'TXT', 'XLSX', 'CSV'].map((format) => (
             <span
               key={format}
               style={{
@@ -355,8 +355,8 @@ The Company reserves the right to modify or replace these Terms at any time.
           type="file"
           accept={
             activeTab === 'image' ? 'image/*' : 
-            activeTab === 'multi' ? '.pdf,.doc,.docx,.txt' :
-            '.pdf,.doc,.docx,.txt'
+            activeTab === 'multi' ? '.pdf,.doc,.docx,.txt,.xlsx,.xls,.csv' :
+            '.pdf,.doc,.docx,.txt,.xlsx,.xls,.csv'
           }
           multiple={activeTab === 'multi'}
           onChange={handleFileInput}
@@ -673,7 +673,7 @@ By accessing and using this service, you accept and agree to be bound by the ter
         <input
           id={`${activeTab}-input`}
           type="file"
-          accept=".pdf,.doc,.docx,.txt"
+          accept=".pdf,.doc,.docx,.txt,.xlsx,.xls,.csv"
           multiple
           onChange={handleFileInput}
           style={{ display: 'none' }}

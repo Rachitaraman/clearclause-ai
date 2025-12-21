@@ -24,9 +24,9 @@ const bedrockClient = new BedrockRuntimeClient(AWS_CONFIG)
 const lambdaClient = new LambdaClient(AWS_CONFIG)
 
 // Configuration constants
-const S3_BUCKET = import.meta.env.VITE_S3_BUCKET || 'impactxaws-docs'
-const TEXTRACT_LAMBDA = import.meta.env.VITE_TEXTRACT_LAMBDA || 'ClearClause_TextractOCR'
-const URL_LAMBDA = import.meta.env.VITE_URL_LAMBDA || 'ClearClause_URLFetcher'
+const S3_BUCKET = import.meta.env.VITE_S3_BUCKET
+const TEXTRACT_LAMBDA = import.meta.env.VITE_TEXTRACT_LAMBDA
+const URL_LAMBDA = import.meta.env.VITE_URL_LAMBDA
 const BEDROCK_MODEL = import.meta.env.VITE_BEDROCK_MODEL || 'anthropic.claude-3-sonnet'
 
 /**
