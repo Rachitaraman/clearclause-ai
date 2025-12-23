@@ -18,7 +18,7 @@ async function debugGeminiIssue() {
         console.log('🔍 Debugging Gemini API issue...');
         console.log('Testing with sample employment agreement text');
         
-        const response = await fetch('http://localhost:3004/api/process', {
+        const response = await fetch('http://localhost:3002/api/process', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

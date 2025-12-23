@@ -17,6 +17,80 @@ export async function processDocument(file, options = {}) {
   }
 
   try {
+    const fileExtension = file.name.split('.').pop().toLowerCase()
+    
+    // Check if it's a PDF file - handle like images with file buffer
+    if (fileExtension === 'pdf') {
+      console.log('📄 Processing PDF document:', file.name)
+      
+      // Stage 1: Convert PDF to base64 for backend processing
+      results.stage = 'textract'
+      results.progress = 30
+
+      const pdfBase64 = await convertFileToBase64(file)
+      console.log('✅ PDF converted to base64, size:', pdfBase64.length)
+
+      results.progress = 50
+
+      // Stage 2: Send PDF to backend for Textract + AI analysis
+      results.stage = 'bedrock'
+      results.progress = 60
+
+      console.log('🚀 Sending PDF to backend for text extraction...')
+
+      const response = await fetch('/api/process', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'analyze',
+          fileBuffer: pdfBase64,
+          documentType: file.type,
+          filename: file.name,
+          isPDF: true
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error(`Backend API error: ${response.status}`)
+      }
+
+      const analysisResult = await response.json()
+      console.log('✅ PDF analysis completed:', analysisResult)
+      results.progress = 90
+
+      // Format results
+      results.data = {
+        document: {
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          source: 'pdf-upload'
+        },
+        extraction: {
+          text: analysisResult.extractedText || 'PDF text extraction',
+          confidence: analysisResult.confidence || 90,
+          method: 'aws-textract-pdf'
+        },
+        analysis: analysisResult.analysis,
+        metadata: {
+          processedAt: analysisResult.processedAt || new Date().toISOString(),
+          model: analysisResult.model,
+          confidence: analysisResult.confidence || 90,
+          extractionService: 'AWS Textract',
+          analysisService: 'Google Gemini',
+          processingMethod: 'hybrid-pdf'
+        }
+      }
+
+      results.stage = 'complete'
+      results.progress = 100
+
+      return results
+    }
+
+    // For non-PDF files, use the original text-based processing
     // Stage 1: Extract text from file
     results.stage = 'textract'
     results.progress = 10
@@ -125,18 +199,23 @@ export async function processImageDocument(file, options = {}) {
   }
 
   try {
-    // For now, return a placeholder for image processing
-    // In a full implementation, this would use OCR services
+    console.log('📸 Processing image document:', file.name)
+    
+    // Stage 1: Convert image to base64 for backend processing
     results.stage = 'textract'
     results.progress = 30
 
-    // Simulate OCR processing
-    const placeholderText = `[Image Document: ${file.name}]\n\nThis is a placeholder for OCR-extracted text from the uploaded image. In a production environment, this would contain the actual text extracted from the image using OCR technology.`
+    const imageBase64 = await convertFileToBase64(file)
+    console.log('✅ Image converted to base64, size:', imageBase64.length)
 
+    results.progress = 50
+
+    // Stage 2: Send image to backend for OCR + AI analysis
     results.stage = 'bedrock'
     results.progress = 60
 
-    // Analyze placeholder text with backend API
+    console.log('🚀 Sending image to backend for OCR processing...')
+
     const response = await fetch('/api/process', {
       method: 'POST',
       headers: {
@@ -144,8 +223,10 @@ export async function processImageDocument(file, options = {}) {
       },
       body: JSON.stringify({
         action: 'analyze',
-        documentText: placeholderText,
-        documentType: 'image'
+        fileBuffer: imageBase64,
+        documentType: file.type,
+        filename: file.name,
+        isImage: true
       })
     })
 
@@ -154,6 +235,7 @@ export async function processImageDocument(file, options = {}) {
     }
 
     const analysisResult = await response.json()
+    console.log('✅ Image analysis completed:', analysisResult)
     results.progress = 90
 
     // Format results
@@ -165,15 +247,18 @@ export async function processImageDocument(file, options = {}) {
         source: 'image-upload'
       },
       extraction: {
-        text: placeholderText,
-        confidence: 85,
-        method: 'ocr-placeholder'
+        text: analysisResult.extractedText || 'OCR text extraction',
+        confidence: analysisResult.confidence || 85,
+        method: 'aws-textract-ocr'
       },
       analysis: analysisResult.analysis,
       metadata: {
         processedAt: analysisResult.processedAt || new Date().toISOString(),
         model: analysisResult.model,
-        confidence: analysisResult.confidence || 85
+        confidence: analysisResult.confidence || 85,
+        extractionService: 'AWS Textract',
+        analysisService: 'Google Gemini',
+        processingMethod: 'hybrid-ocr'
       }
     }
 
@@ -188,6 +273,22 @@ export async function processImageDocument(file, options = {}) {
     results.stage = 'error'
     return results
   }
+}
+
+/**
+ * Convert file to base64 string
+ */
+async function convertFileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      // Remove the data URL prefix (e.g., "data:image/jpeg;base64,")
+      const base64 = reader.result.split(',')[1]
+      resolve(base64)
+    }
+    reader.onerror = (error) => reject(error)
+    reader.readAsDataURL(file)
+  })
 }
 
 /**

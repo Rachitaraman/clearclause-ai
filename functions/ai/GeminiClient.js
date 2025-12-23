@@ -59,73 +59,96 @@ export class GeminiClient extends AIClient {
   }
 
   /**
-   * Analyze document using Gemini API
+   * Analyze document using Gemini API with retry logic
    */
   async analyzeDocument(text, documentType) {
     const startTime = Date.now()
+    const maxRetries = 3
+    let lastError = null
     
-    try {
-      console.log(`🤖 Invoking Gemini model: ${this.modelName}`)
-      
-      // Create analysis prompt optimized for Gemini
-      const prompt = this.createAnalysisPrompt(text, documentType)
-      
-      // Configure generation parameters
-      const generationConfig = {
-        temperature: 0.2,
-        topP: 0.8,
-        topK: 40,
-        maxOutputTokens: 8000, // Increased for longer responses
-        responseMimeType: "application/json"
-      }
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`🤖 Invoking Gemini model: ${this.modelName} (Attempt ${attempt}/${maxRetries})`)
+        
+        // Create analysis prompt optimized for Gemini
+        const prompt = this.createAnalysisPrompt(text, documentType)
+        
+        // Configure generation parameters
+        const generationConfig = {
+          temperature: 0.2,
+          topP: 0.8,
+          topK: 40,
+          maxOutputTokens: 8000, // Increased for longer responses
+          responseMimeType: "application/json"
+        }
 
-      // Generate content using Gemini
-      const result = await this.model.generateContent({
-        contents: [{
-          parts: [{ text: prompt }]
-        }],
-        generationConfig
-      })
+        // Generate content using Gemini
+        const result = await this.model.generateContent({
+          contents: [{
+            parts: [{ text: prompt }]
+          }],
+          generationConfig
+        })
 
-      const response = await result.response
-      const responseText = response.text()
-      
-      // 🔥 DEBUG: Log raw Gemini response
-      console.log('🤖 RAW GEMINI RESPONSE:')
-      console.log('Length:', responseText.length)
-      console.log('First 500 chars:', responseText.substring(0, 500))
-      console.log('Last 500 chars:', responseText.substring(Math.max(0, responseText.length - 500)))
-      
-      // Parse the response
-      const analysis = this.parseGeminiResponse(responseText, text)
-      
-      const processingTime = Date.now() - startTime
-      console.log(`✅ Gemini analysis completed successfully in ${processingTime}ms!`)
-      
-      return {
-        success: true,
-        analysis: analysis,
-        confidence: this.calculateAnalysisConfidence(analysis),
-        startTime: startTime,
-        processingTime: processingTime,
-        model: this.modelName,
-        tokenUsage: {
-          promptTokens: result.response.usageMetadata?.promptTokenCount || 0,
-          completionTokens: result.response.usageMetadata?.candidatesTokenCount || 0,
-          totalTokens: result.response.usageMetadata?.totalTokenCount || 0
+        const response = await result.response
+        const responseText = response.text()
+        
+        // 🔥 DEBUG: Log raw Gemini response
+        console.log('🤖 RAW GEMINI RESPONSE:')
+        console.log('Length:', responseText.length)
+        console.log('First 500 chars:', responseText.substring(0, 500))
+        console.log('Last 500 chars:', responseText.substring(Math.max(0, responseText.length - 500)))
+        
+        // Parse the response
+        const analysis = this.parseGeminiResponse(responseText, text)
+        
+        const processingTime = Date.now() - startTime
+        console.log(`✅ Gemini analysis completed successfully in ${processingTime}ms!`)
+        
+        return {
+          success: true,
+          analysis: analysis,
+          confidence: this.calculateAnalysisConfidence(analysis),
+          startTime: startTime,
+          processingTime: processingTime,
+          model: this.modelName,
+          tokenUsage: {
+            promptTokens: result.response.usageMetadata?.promptTokenCount || 0,
+            completionTokens: result.response.usageMetadata?.candidatesTokenCount || 0,
+            totalTokens: result.response.usageMetadata?.totalTokenCount || 0
+          }
+        }
+        
+      } catch (error) {
+        lastError = error
+        console.error(`❌ Gemini analysis attempt ${attempt} failed:`, error.message)
+        
+        // Check if it's a quota/rate limit error
+        if (error.message.includes('429') || error.message.includes('quota') || error.message.includes('Too Many Requests')) {
+          console.log('🚫 QUOTA EXCEEDED - Will use fallback in main process')
+          console.log('💡 Please wait for quota reset or upgrade your Gemini API plan')
+          
+          // Don't retry for quota errors - fail immediately to allow fallback
+          break
+        }
+        
+        // For other errors, wait before retry
+        if (attempt < maxRetries) {
+          const waitTime = attempt * 2000 // 2s, 4s, 6s
+          console.log(`⏳ Waiting ${waitTime}ms before retry...`)
+          await new Promise(resolve => setTimeout(resolve, waitTime))
         }
       }
-      
-    } catch (error) {
-      const processingTime = Date.now() - startTime
-      console.error('Gemini analysis error:', error)
-      
-      return {
-        success: false,
-        error: error.message,
-        startTime: startTime,
-        processingTime: processingTime
-      }
+    }
+    
+    const processingTime = Date.now() - startTime
+    console.error('❌ All Gemini analysis attempts failed')
+    
+    return {
+      success: false,
+      error: lastError?.message || 'Unknown error',
+      startTime: startTime,
+      processingTime: processingTime
     }
   }
 

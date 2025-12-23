@@ -3,55 +3,36 @@
  * Handles document processing requests with AWS integration
  */
 
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
-import { TextractClient, DetectDocumentTextCommand } from '@aws-sdk/client-textract'
-import { GeminiClient } from './ai/GeminiClient.js'
+import { HybridDocumentProcessor } from './HybridDocumentProcessor.js'
 import { GeminiErrorHandler } from './ai/GeminiErrorHandler.js'
-import { GeminiResponseParser } from './ai/GeminiResponseParser.js'
 import dotenv from 'dotenv'
 
 // Load environment variables
 dotenv.config()
 
-// AWS Configuration
-const AWS_CONFIG = {
-    region: process.env.VITE_AWS_REGION,
-    credentials: {
-        accessKeyId: process.env.VITE_AWS_ACCESS_KEY_ID,
-        secretAccessKey: process.env.VITE_AWS_SECRET_ACCESS_KEY
-    },
-    maxAttempts: 3,
-    retryMode: 'standard'
-}
-
-// Initialize AWS clients (S3 and Textract still needed)
-const s3Client = new S3Client(AWS_CONFIG)
-const textractClient = new TextractClient(AWS_CONFIG)
-
-// Initialize Gemini client and utilities
-let geminiClient = null
+// Initialize Hybrid Document Processor
+let hybridProcessor = null
 const geminiErrorHandler = new GeminiErrorHandler()
-const geminiResponseParser = new GeminiResponseParser()
 
-function createGeminiClient() {
-    if (!geminiClient) {
+function createHybridProcessor() {
+    if (!hybridProcessor) {
         try {
-            geminiClient = new GeminiClient()
+            hybridProcessor = new HybridDocumentProcessor()
         } catch (error) {
-            console.error('Failed to initialize Gemini client:', error.message)
-            geminiClient = null
+            console.error('Failed to initialize Hybrid Document Processor:', error.message)
+            hybridProcessor = null
         }
     }
-    return geminiClient
+    return hybridProcessor
 }
 
 // Configuration constants
-const S3_BUCKET = process.env.VITE_S3_BUCKET
 const GEMINI_MODEL = process.env.VITE_GEMINI_MODEL || 'gemini-pro'
 
-console.log('🔧 Current Configuration:')
-console.log('- S3 Bucket:', S3_BUCKET)
-console.log('- AI Model:', GEMINI_MODEL, '(Gemini)')
+console.log('🔧 Hybrid Configuration:')
+console.log('- Extraction Service: AWS (S3 + Textract)')
+console.log('- Analysis Service: Google Gemini')
+console.log('- AI Model:', GEMINI_MODEL)
 
 
 /**
@@ -99,12 +80,12 @@ async function handlePost(body, headers) {
         // Check if this is a connectivity test request
         if (body && body.test === 'hello backend') {
             return createSuccessResponse(200, {
-                message: 'ClearClause AI Backend is working',
+                message: 'ClearClause AI Hybrid Backend is working',
                 timestamp: new Date().toISOString(),
                 services: {
-                    s3: 'connected',
-                    textract: 'connected', 
-                    gemini: 'connected'
+                    extraction: 'AWS (S3 + Textract)',
+                    analysis: 'Google Gemini',
+                    status: 'connected'
                 }
             });
         }
@@ -161,65 +142,80 @@ function handleDelete(query) {
 }
 
 /**
- * Process document analysis request
+ * Process document analysis request using hybrid approach
  */
 async function processDocumentAnalysis(requestBody) {
     try {
-        const { documentText, documentType, filename, s3Key } = requestBody;
-        let textToAnalyze = documentText;
-
-        // Check if this is an Excel file
-        const isExcelFile = filename && (
-            filename.toLowerCase().endsWith('.xlsx') || 
-            filename.toLowerCase().endsWith('.xls') || 
-            filename.toLowerCase().endsWith('.csv')
-        );
-
-        // If S3 key is provided, extract text using Textract
-        if (s3Key && !documentText) {
-            const textractResult = await extractTextFromS3(s3Key);
-            if (!textractResult.success) {
-                return createErrorResponse(500, 'Textract Error', textractResult.error);
-            }
-            textToAnalyze = textractResult.text;
+        const { documentText, documentType, filename, s3Key, fileBuffer } = requestBody;
+        
+        console.log('🚀 Starting hybrid document analysis...');
+        
+        const processor = createHybridProcessor();
+        if (!processor) {
+            throw new Error('Hybrid processor not available');
         }
 
-        // For Excel files, add special processing note
-        if (isExcelFile) {
-            textToAnalyze = `[Excel Document Analysis: ${filename}]\n\n${textToAnalyze}\n\nNote: This Excel/CSV file contains structured data that has been processed for contract analysis.`;
-        }
-
-        console.log('🚀 Starting Gemini analysis...');
         let analysisResult;
         let usingRealAI = false;
         let errorDetails = null;
         
         try {
-            analysisResult = await analyzeWithGemini(textToAnalyze);
-            if (analysisResult.success) {
-                usingRealAI = true;
-                console.log('✅ Real AI analysis completed successfully!');
+            // Determine input type and process accordingly
+            let documentInput;
+            let options = { filename: filename || 'document' };
+            
+            if (s3Key) {
+                // Existing S3 document
+                options.s3Key = s3Key;
+                documentInput = null;
+            } else if (fileBuffer) {
+                // File buffer for upload
+                documentInput = Buffer.from(fileBuffer, 'base64');
+            } else if (documentText) {
+                // Direct text input
+                documentInput = documentText;
             } else {
-                errorDetails = analysisResult.error;
-                console.log('❌ Gemini analysis failed:', errorDetails);
+                throw new Error('No valid document input provided');
             }
+
+            // Process with hybrid approach
+            const hybridResult = await processor.processDocument(documentInput, options);
+            
+            if (hybridResult.success) {
+                analysisResult = {
+                    success: true,
+                    analysis: hybridResult.analysis,
+                    confidence: hybridResult.metadata.confidence,
+                    startTime: Date.now() - hybridResult.metadata.processingTime,
+                    processingTime: hybridResult.metadata.processingTime,
+                    extractionMethod: hybridResult.extraction.method,
+                    extractionService: hybridResult.metadata.extractionService,
+                    analysisService: hybridResult.metadata.analysisService
+                };
+                usingRealAI = true;
+                console.log('✅ Hybrid processing completed successfully!');
+            } else {
+                throw new Error(hybridResult.error || 'Hybrid processing failed');
+            }
+            
         } catch (error) {
             errorDetails = error.message;
-            console.log('❌ Gemini analysis threw exception:', errorDetails);
-        }
-
-        // Fallback to mock data if real AI failed
-        if (!analysisResult || !analysisResult.success) {
+            console.log('❌ Hybrid processing failed:', errorDetails);
+            
+            // Fallback to mock data
             console.log('🔄 Falling back to enhanced mock analysis...');
             analysisResult = {
                 success: true,
-                analysis: generateMockAnalysis(textToAnalyze),
-                confidence: 92
+                analysis: generateMockAnalysis(documentText || 'Sample document text'),
+                confidence: 85,
+                extractionMethod: 'fallback',
+                extractionService: 'Mock',
+                analysisService: 'Mock'
             };
             usingRealAI = false;
         }
 
-        // Enhanced response with processing details
+        // Enhanced response with hybrid processing details
         const response = {
             analysis: analysisResult.analysis,
             confidence: analysisResult.confidence,
@@ -227,24 +223,24 @@ async function processDocumentAnalysis(requestBody) {
             model: usingRealAI ? GEMINI_MODEL : 'mock-analysis-enhanced',
             usingRealAI: usingRealAI,
             processingDetails: {
-                source: usingRealAI ? 'real-ai' : 'mock-fallback',
-                processingTime: Date.now() - (analysisResult.startTime || Date.now())
+                source: usingRealAI ? 'hybrid-processing' : 'mock-fallback',
+                extractionService: analysisResult.extractionService || 'Unknown',
+                analysisService: analysisResult.analysisService || 'Unknown',
+                extractionMethod: analysisResult.extractionMethod || 'unknown',
+                processingTime: analysisResult.processingTime || 0,
+                hybrid: usingRealAI
             }
         };
 
         // DEBUG: Log the actual response being sent to frontend
-        console.log('📤 SENDING TO FRONTEND:');
-        console.log('- Analysis clauses count:', analysisResult.analysis?.clauses?.length || 0);
-        console.log('- Analysis risks count:', analysisResult.analysis?.risks?.length || 0);
-        console.log('- Response structure:', JSON.stringify({
-            analysis: {
-                summary: analysisResult.analysis?.summary,
-                clausesCount: analysisResult.analysis?.clauses?.length,
-                risksCount: analysisResult.analysis?.risks?.length
-            }
-        }, null, 2));
+        console.log('📤 HYBRID RESPONSE TO FRONTEND:');
+        console.log('- Using Real AI:', response.usingRealAI);
+        console.log('- Extraction Service:', response.processingDetails.extractionService);
+        console.log('- Analysis Service:', response.processingDetails.analysisService);
+        console.log('- Clauses found:', response.analysis?.clauses?.length || 0);
+        console.log('- Risks found:', response.analysis?.risks?.length || 0);
 
-        // Include error details if AI failed
+        // Include error details if hybrid processing failed
         if (errorDetails && !usingRealAI) {
             response.errorDetails = errorDetails;
         }
@@ -257,79 +253,7 @@ async function processDocumentAnalysis(requestBody) {
     }
 }
 
-/**
- * Analyze document with Gemini
- */
-async function analyzeWithGemini(documentText) {
-    const startTime = Date.now();
-    
-    try {
-        const client = createGeminiClient();
-        if (!client) {
-            throw new Error('Gemini client not available');
-        }
-
-        const documentType = detectDocumentType(documentText);
-        console.log(`🤖 Invoking Gemini model: ${GEMINI_MODEL}`);
-        
-        // Use the Gemini client to analyze the document
-        const result = await client.analyzeDocument(documentText, documentType);
-        
-        if (result.success) {
-            const processingTime = Date.now() - startTime;
-            console.log(`✅ Gemini analysis completed successfully in ${processingTime}ms!`);
-            
-            return {
-                success: true,
-                analysis: result.analysis,
-                confidence: result.confidence,
-                startTime: startTime,
-                processingTime: processingTime,
-                tokenUsage: result.tokenUsage
-            };
-        } else {
-            throw new Error(result.error || 'Gemini analysis failed');
-        }
-        
-    } catch (error) {
-        const processingTime = Date.now() - startTime;
-        console.error('Gemini analysis error:', error);
-        
-        // Use error handler to determine if we should fallback
-        const errorResponse = await geminiErrorHandler.handleError(error, { 
-            documentText, 
-            attempt: 0 
-        });
-        
-        if (errorResponse.shouldFallback) {
-            // Create fallback analysis
-            const fallbackResult = geminiErrorHandler.createFallbackAnalysis(
-                documentText, 
-                errorResponse.error, 
-                errorResponse.message
-            );
-            
-            return {
-                success: true, // Fallback is considered successful
-                analysis: fallbackResult.analysis,
-                confidence: fallbackResult.confidence,
-                startTime: startTime,
-                processingTime: processingTime,
-                fallbackUsed: true,
-                originalError: error.message
-            };
-        }
-        
-        return {
-            success: false,
-            error: error.message,
-            startTime: startTime,
-            processingTime: processingTime
-        };
-    }
-}
-
-// Legacy functions removed - now using Gemini client classes
+// Legacy functions removed - now using HybridDocumentProcessor
 
 /**
  * Detect document type based on content
@@ -378,31 +302,141 @@ function generateMockAnalysis(documentText) {
             mainParties: ["Party A", "Party B"],
             effectiveDate: new Date().toISOString().split('T')[0],
             expirationDate: null,
-            totalClausesIdentified: 4,
+            totalClausesIdentified: 8,
             completenessScore: 85
         },
         clauses: [
             {
                 id: "clause_1",
-                title: "Main Terms",
+                title: "Main Terms and Conditions",
                 content: documentText.substring(0, Math.min(200, documentText.length)),
                 category: "general",
                 riskLevel: "medium",
                 explanation: "Primary terms and conditions of the agreement",
                 sourceLocation: "Document body",
                 keyTerms: ["terms", "conditions", "agreement"]
+            },
+            {
+                id: "clause_2",
+                title: "Payment and Compensation",
+                content: "Payment terms and compensation details as specified in the agreement",
+                category: "financial",
+                riskLevel: "high",
+                explanation: "Defines payment obligations and compensation structure",
+                sourceLocation: "Payment section",
+                keyTerms: ["payment", "compensation", "fees"]
+            },
+            {
+                id: "clause_3",
+                title: "Termination Provisions",
+                content: "Conditions under which the agreement may be terminated",
+                category: "termination",
+                riskLevel: "medium",
+                explanation: "Specifies termination rights and procedures",
+                sourceLocation: "Termination clause",
+                keyTerms: ["termination", "end", "cancel"]
+            },
+            {
+                id: "clause_4",
+                title: "Confidentiality Agreement",
+                content: "Obligations to maintain confidentiality of proprietary information",
+                category: "confidentiality",
+                riskLevel: "high",
+                explanation: "Protects sensitive business information",
+                sourceLocation: "Confidentiality section",
+                keyTerms: ["confidential", "proprietary", "non-disclosure"]
+            },
+            {
+                id: "clause_5",
+                title: "Intellectual Property Rights",
+                content: "Ownership and usage rights for intellectual property",
+                category: "intellectual_property",
+                riskLevel: "critical",
+                explanation: "Defines IP ownership and licensing terms",
+                sourceLocation: "IP section",
+                keyTerms: ["intellectual property", "copyright", "ownership"]
+            },
+            {
+                id: "clause_6",
+                title: "Limitation of Liability",
+                content: "Limits on liability and damages for each party",
+                category: "liability",
+                riskLevel: "high",
+                explanation: "Restricts potential liability exposure",
+                sourceLocation: "Liability section",
+                keyTerms: ["liability", "damages", "limitation"]
+            },
+            {
+                id: "clause_7",
+                title: "Governing Law",
+                content: "Jurisdiction and applicable law for the agreement",
+                category: "legal",
+                riskLevel: "low",
+                explanation: "Specifies legal jurisdiction and governing law",
+                sourceLocation: "Legal provisions",
+                keyTerms: ["governing law", "jurisdiction", "legal"]
+            },
+            {
+                id: "clause_8",
+                title: "Dispute Resolution",
+                content: "Process for resolving disputes between parties",
+                category: "dispute_resolution",
+                riskLevel: "medium",
+                explanation: "Defines how conflicts will be resolved",
+                sourceLocation: "Dispute section",
+                keyTerms: ["dispute", "arbitration", "resolution"]
             }
         ],
         risks: [
             {
                 id: "risk_1",
-                title: "General Contract Risk",
-                description: "This agreement contains terms that require careful review",
-                severity: "medium",
+                title: "High Liability Exposure",
+                description: "Agreement may expose parties to significant financial liability",
+                severity: "high",
+                category: "financial",
+                recommendation: "Review liability limitations and consider additional insurance",
+                clauseReference: "clause_6",
+                supportingText: "Liability provisions may be insufficient"
+            },
+            {
+                id: "risk_2",
+                title: "Intellectual Property Disputes",
+                description: "Unclear IP ownership could lead to future disputes",
+                severity: "critical",
                 category: "legal",
-                recommendation: "Review all terms with legal counsel",
-                clauseReference: "clause_1",
-                supportingText: "Various contract provisions"
+                recommendation: "Clarify IP ownership and licensing terms",
+                clauseReference: "clause_5",
+                supportingText: "IP rights not clearly defined"
+            },
+            {
+                id: "risk_3",
+                title: "Confidentiality Breach Risk",
+                description: "Inadequate confidentiality protections for sensitive information",
+                severity: "medium",
+                category: "operational",
+                recommendation: "Strengthen confidentiality provisions and add penalties",
+                clauseReference: "clause_4",
+                supportingText: "Confidentiality terms may be too broad"
+            },
+            {
+                id: "risk_4",
+                title: "Payment Default Risk",
+                description: "Payment terms may not adequately protect against defaults",
+                severity: "high",
+                category: "financial",
+                recommendation: "Add payment guarantees and late payment penalties",
+                clauseReference: "clause_2",
+                supportingText: "Payment security measures insufficient"
+            },
+            {
+                id: "risk_5",
+                title: "Termination Complications",
+                description: "Termination procedures may be unclear or inadequate",
+                severity: "medium",
+                category: "operational",
+                recommendation: "Clarify termination procedures and notice requirements",
+                clauseReference: "clause_3",
+                supportingText: "Termination process needs clarification"
             }
         ],
         keyTerms: [
@@ -411,59 +445,67 @@ function generateMockAnalysis(documentText) {
                 definition: "The legal contract between the parties",
                 importance: "high",
                 context: "Throughout the document"
+            },
+            {
+                term: "Confidential Information",
+                definition: "Proprietary or sensitive business information",
+                importance: "high",
+                context: "Confidentiality provisions"
+            },
+            {
+                term: "Intellectual Property",
+                definition: "Patents, copyrights, trademarks, and trade secrets",
+                importance: "critical",
+                context: "IP ownership clauses"
+            },
+            {
+                term: "Liability",
+                definition: "Legal responsibility for damages or losses",
+                importance: "high",
+                context: "Liability limitation clauses"
             }
         ],
         recommendations: [
             {
+                priority: "critical",
+                action: "Clarify intellectual property ownership and licensing terms",
+                rationale: "Prevent future IP disputes and ensure clear ownership",
+                affectedClauses: ["clause_5"]
+            },
+            {
+                priority: "high",
+                action: "Review and strengthen liability limitations",
+                rationale: "Protect against excessive financial exposure",
+                affectedClauses: ["clause_6"]
+            },
+            {
+                priority: "high",
+                action: "Add payment security measures and penalties",
+                rationale: "Reduce payment default risk",
+                affectedClauses: ["clause_2"]
+            },
+            {
                 priority: "medium",
-                action: "Review all contract terms carefully",
-                rationale: "All contracts require thorough review",
-                affectedClauses: ["clause_1"]
+                action: "Enhance confidentiality provisions",
+                rationale: "Better protect sensitive business information",
+                affectedClauses: ["clause_4"]
+            },
+            {
+                priority: "medium",
+                action: "Clarify termination procedures and requirements",
+                rationale: "Avoid complications during contract termination",
+                affectedClauses: ["clause_3"]
             }
         ],
         qualityMetrics: {
             clauseDetectionConfidence: 75,
             analysisCompleteness: 85,
-            potentialMissedClauses: ["specific_terms"]
+            potentialMissedClauses: ["warranties", "indemnification", "force_majeure"]
         }
     };
 }
 
-/**
- * Extract text from S3 document using Textract
- */
-async function extractTextFromS3(s3Key) {
-    try {
-        const params = {
-            Document: {
-                S3Object: {
-                    Bucket: S3_BUCKET,
-                    Name: s3Key
-                }
-            }
-        };
-
-        const command = new DetectDocumentTextCommand(params);
-        const result = await textractClient.send(command);
-        
-        const extractedText = result.Blocks
-            .filter(block => block.BlockType === 'LINE')
-            .map(block => block.Text)
-            .join('\n');
-
-        return {
-            success: true,
-            text: extractedText,
-            confidence: 95
-        };
-    } catch (error) {
-        console.error('Textract error:', error);
-        return {
-            success: false,
-            error: error.message
-        };
-    }
-}
+// Legacy functions removed - now using HybridDocumentProcessor
 
 /**
  * Process document comparison request

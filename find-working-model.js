@@ -1,46 +1,56 @@
-import { GoogleGenerativeAI } from '@google/generative-ai'
-import dotenv from 'dotenv'
+/**
+ * Find a working Gemini model
+ */
 
-dotenv.config()
+import { GoogleGenerativeAI } from '@google/generative-ai';
+
+const API_KEY = 'AIzaSyCNtkTj8TgMBjS9O3nG9oRGg1Qnln6Eqro';
+
+const modelsToTry = [
+    'gemini-1.5-pro',
+    'gemini-1.5-flash',
+    'gemini-pro',
+    'gemini-pro-vision',
+    'models/gemini-1.5-pro',
+    'models/gemini-1.5-flash',
+    'models/gemini-pro',
+    'models/gemini-pro-vision'
+];
 
 async function findWorkingModel() {
-    const commonModels = [
-        'gemini-1.5-flash',
-        'gemini-1.5-pro',
-        'gemini-pro',
-        'gemini-1.5-flash-latest',
-        'gemini-1.5-pro-latest',
-        'gemini-pro-vision'
-    ]
+    const genAI = new GoogleGenerativeAI(API_KEY);
     
-    console.log('🔍 Testing common Gemini models...')
-    
-    for (const modelName of commonModels) {
+    for (const modelName of modelsToTry) {
         try {
-            console.log(`\n📝 Testing: ${modelName}`)
+            console.log(`🧪 Testing model: ${modelName}`);
             
-            const genAI = new GoogleGenerativeAI(process.env.VITE_GOOGLE_AI_API_KEY)
-            const model = genAI.getGenerativeModel({ model: modelName })
-
-            const result = await model.generateContent("Hello")
-            const response = await result.response
-            const text = response.text()
+            const model = genAI.getGenerativeModel({ 
+                model: modelName,
+                generationConfig: {
+                    temperature: 0.2,
+                    maxOutputTokens: 50,
+                }
+            });
             
-            console.log(`✅ SUCCESS! Model "${modelName}" works!`)
-            console.log(`📄 Response: ${text.substring(0, 50)}...`)
+            const result = await model.generateContent({
+                contents: [{
+                    parts: [{ text: "Hello" }]
+                }]
+            });
             
-            // Update .env file with working model
-            console.log(`\n🎯 Use this in your .env file:`)
-            console.log(`VITE_GEMINI_MODEL=${modelName}`)
+            const response = result.response;
+            const text = response.text();
             
-            return modelName
+            console.log(`✅ SUCCESS with ${modelName}! Response: ${text.substring(0, 100)}`);
+            return modelName;
             
         } catch (error) {
-            console.log(`❌ Failed: ${error.message.substring(0, 100)}...`)
+            console.log(`❌ Failed with ${modelName}: ${error.message.substring(0, 100)}...`);
         }
     }
     
-    console.log('\n❌ No working models found. Check your API key permissions.')
+    console.log('❌ No working models found');
+    return null;
 }
 
-findWorkingModel()
+findWorkingModel();
