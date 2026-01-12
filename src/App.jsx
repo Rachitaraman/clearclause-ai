@@ -34,9 +34,6 @@ import {
     transformAnalysisForUI 
 } from './utils/documentProcessor.js'
 
-// Mock data (fallback)
-import { mockData } from './utils/mockData.js'
-
 function App() {
     // ---------------- ROUTING ----------------
     const [currentPath, setCurrentPath] = useState(window.location.pathname)
@@ -170,20 +167,12 @@ function App() {
             console.error('Analysis failed:', error)
             console.error('Error details:', error.stack)
             
-            // Fallback to mock data on error
-            console.log('Falling back to mock data due to error:', error.message)
-            setStage('bedrock')
+            // No fallback to mock data - show error to user
+            setLoading(false)
+            setStage(null)
             
-            setTimeout(() => {
-                setResult(mockData)
-                setLoading(false)
-                setStage(null)
-
-                const newItem = `Analysis (Mock) – ${new Date().toLocaleString()}`
-                const updated = [newItem, ...history]
-                setHistory(updated)
-                localStorage.setItem('history', JSON.stringify(updated))
-            }, 1500)
+            // Show error message to user
+            alert(`Analysis failed: ${error.message}\n\nPlease check your internet connection and try again. The system requires a valid connection to the AI analysis service.`)
         }
     }
 

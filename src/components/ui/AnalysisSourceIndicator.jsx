@@ -7,7 +7,10 @@ import React from 'react'
 function AnalysisSourceIndicator({ metadata, errorDetails }) {
     if (!metadata) return null
 
-    const isRealAI = metadata.usingRealAI || metadata.processingDetails?.source === 'real-ai'
+    const isRealAI = metadata.usingRealAI || 
+                     metadata.processingDetails?.source === 'enhanced-ai-contract-analysis' ||
+                     metadata.processingDetails?.source === 'real-ai-only' ||
+                     metadata.aiAnalysis?.modelUsed?.includes('gemini')
     const credentialStatus = metadata.processingDetails?.credentialStatus
 
     return (
@@ -108,7 +111,7 @@ function AnalysisSourceIndicator({ metadata, errorDetails }) {
                     color: 'var(--green-700)',
                     marginTop: '4px'
                 }}>
-                    ✓ Analysis powered by Claude AI with {metadata.confidence || 95}% confidence
+                    ✓ Analysis powered by Gemini AI with {metadata.confidence || 95}% confidence
                 </div>
             )}
         </div>

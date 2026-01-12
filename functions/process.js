@@ -1,6 +1,6 @@
 /**
- * ClearClause AI Backend Function - Clean Version
- * Handles document processing requests with AWS integration
+ * ClearClause AI Backend Function - Enhanced Version
+ * Handles document processing requests with AWS integration and enhanced AI
  */
 
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
@@ -8,6 +8,7 @@ import { TextractClient, DetectDocumentTextCommand } from '@aws-sdk/client-textr
 import { GeminiClient } from './ai/GeminiClient.js'
 import { GeminiErrorHandler } from './ai/GeminiErrorHandler.js'
 import { GeminiResponseParser } from './ai/GeminiResponseParser.js'
+import { ContractProcessor } from '../src/processors/ContractProcessor.js';
 import dotenv from 'dotenv'
 
 // Load environment variables
@@ -24,9 +25,24 @@ const AWS_CONFIG = {
     retryMode: 'standard'
 }
 
-// Initialize AWS clients (S3 and Textract still needed)
+// Initialize AWS clients
 const s3Client = new S3Client(AWS_CONFIG)
 const textractClient = new TextractClient(AWS_CONFIG)
+
+// Initialize the new AI contract processor
+let contractProcessor = null;
+
+function createContractProcessor() {
+    if (!contractProcessor) {
+        try {
+            contractProcessor = new ContractProcessor();
+        } catch (error) {
+            console.error('Failed to initialize Contract Processor:', error.message);
+            contractProcessor = null;
+        }
+    }
+    return contractProcessor;
+}
 
 // Initialize Gemini client and utilities
 let geminiClient = null
@@ -52,7 +68,6 @@ const GEMINI_MODEL = process.env.VITE_GEMINI_MODEL || 'gemini-pro'
 console.log('🔧 Current Configuration:')
 console.log('- S3 Bucket:', S3_BUCKET)
 console.log('- AI Model:', GEMINI_MODEL, '(Gemini)')
-
 
 /**
  * Main serverless function handler
@@ -109,9 +124,9 @@ async function handlePost(body, headers) {
             });
         }
 
-        // Handle document analysis requests
+        // Handle document analysis requests with enhanced AI system
         if (body && body.action === 'analyze') {
-            return await processDocumentAnalysis(body);
+            return await processDocumentAnalysisWithEnhancedAI(body);
         }
 
         // Handle document comparison requests
@@ -161,19 +176,105 @@ function handleDelete(query) {
 }
 
 /**
- * Process document analysis request
+ * Process document analysis request with enhanced AI system
  */
-async function processDocumentAnalysis(requestBody) {
+async function processDocumentAnalysisWithEnhancedAI(requestBody) {
+    try {
+        const { documentText, documentType, filename, s3Key, imageData, url, urls, images } = requestBody;
+        
+        console.log('🚀 Starting enhanced AI contract analysis...');
+        
+        const processor = createContractProcessor();
+        if (!processor) {
+            throw new Error('Contract processor not available');
+        }
+
+        let analysis;
+        
+        // Handle different input types
+        if (imageData && imageData.buffer) {
+            // Single image processing
+            const imageBuffer = Buffer.from(imageData.buffer, 'base64');
+            analysis = await processor.processImage(imageBuffer, imageData.mimeType || 'image/jpeg');
+        } else if (images && Array.isArray(images)) {
+            // Multiple images processing
+            const imageBuffers = images.map(img => ({
+                buffer: Buffer.from(img.buffer, 'base64'),
+                mimeType: img.mimeType || 'image/jpeg'
+            }));
+            analysis = await processor.processImages(imageBuffers);
+        } else if (url) {
+            // Single URL processing
+            analysis = await processor.processURL(url);
+        } else if (urls && Array.isArray(urls)) {
+            // Multiple URLs processing
+            analysis = await processor.processURLs(urls);
+        } else if (s3Key && !documentText) {
+            // S3 document processing
+            const textractResult = await extractTextFromS3(s3Key);
+            if (!textractResult.success) {
+                return createErrorResponse(500, 'Textract Error', textractResult.error);
+            }
+            analysis = await processor.processContract(textractResult.text, {
+                filename: filename || 'document.txt',
+                mimeType: 'text/plain'
+            });
+        } else {
+            // Text processing
+            const textToAnalyze = documentText || '';
+            if (!textToAnalyze.trim()) {
+                return createErrorResponse(400, 'Invalid Input', 'No content provided for analysis');
+            }
+            
+            analysis = await processor.processContract(textToAnalyze, {
+                filename: filename || 'document.txt',
+                mimeType: 'text/plain'
+            });
+        }
+
+        console.log('✅ Enhanced AI contract analysis completed successfully!');
+
+        const response = {
+            analysis: {
+                summary: analysis.summary,
+                clauses: analysis.clauses,
+                risks: analysis.risks,
+                recommendations: analysis.recommendations,
+                keyTerms: analysis.clauses.map(c => ({
+                    term: c.type,
+                    definition: c.text.substring(0, 100),
+                    importance: c.confidence > 0.8 ? 'high' : 'medium',
+                    context: c.category
+                }))
+            },
+            confidence: Math.round(analysis.metadata.confidence * 100),
+            processedAt: new Date().toISOString(),
+            model: analysis.metadata.modelUsed,
+            usingRealAI: true,
+            processingDetails: {
+                source: 'enhanced-ai-contract-analysis',
+                processingTime: analysis.metadata.processingTime,
+                tokenUsage: analysis.metadata.tokenUsage,
+                extractionMethod: analysis.metadata.extractionMethod || 'text'
+            }
+        };
+
+        return createSuccessResponse(200, response);
+
+    } catch (error) {
+        console.log('❌ Enhanced AI analysis failed:', error.message);
+        // Force error instead of fallback - no mock data allowed
+        return createErrorResponse(500, 'AI Analysis Failed', `Real-time AI analysis failed: ${error.message}. Please check your Gemini API key and try again.`);
+    }
+}
+
+/**
+ * Legacy process document analysis request (fallback)
+ */
+async function processDocumentAnalysisWithAI(requestBody) {
     try {
         const { documentText, documentType, filename, s3Key } = requestBody;
         let textToAnalyze = documentText;
-
-        // Check if this is an Excel file
-        const isExcelFile = filename && (
-            filename.toLowerCase().endsWith('.xlsx') || 
-            filename.toLowerCase().endsWith('.xls') || 
-            filename.toLowerCase().endsWith('.csv')
-        );
 
         // If S3 key is provided, extract text using Textract
         if (s3Key && !documentText) {
@@ -182,11 +283,6 @@ async function processDocumentAnalysis(requestBody) {
                 return createErrorResponse(500, 'Textract Error', textractResult.error);
             }
             textToAnalyze = textractResult.text;
-        }
-
-        // For Excel files, add special processing note
-        if (isExcelFile) {
-            textToAnalyze = `[Excel Document Analysis: ${filename}]\n\n${textToAnalyze}\n\nNote: This Excel/CSV file contains structured data that has been processed for contract analysis.`;
         }
 
         console.log('🚀 Starting Gemini analysis...');
@@ -208,47 +304,25 @@ async function processDocumentAnalysis(requestBody) {
             console.log('❌ Gemini analysis threw exception:', errorDetails);
         }
 
-        // Fallback to mock data if real AI failed
+        // No fallback to mock data - force real AI only
         if (!analysisResult || !analysisResult.success) {
-            console.log('🔄 Falling back to enhanced mock analysis...');
-            analysisResult = {
-                success: true,
-                analysis: generateMockAnalysis(textToAnalyze),
-                confidence: 92
-            };
-            usingRealAI = false;
+            console.log('❌ Real AI analysis failed - no mock fallback allowed');
+            return createErrorResponse(500, 'AI Analysis Failed', `Gemini AI analysis failed: ${errorDetails || 'Unknown error'}. Please check your API key and try again.`);
         }
 
-        // Enhanced response with processing details
         const response = {
             analysis: analysisResult.analysis,
             confidence: analysisResult.confidence,
             processedAt: new Date().toISOString(),
-            model: usingRealAI ? GEMINI_MODEL : 'mock-analysis-enhanced',
-            usingRealAI: usingRealAI,
+            model: GEMINI_MODEL,
+            usingRealAI: true, // Always true now
             processingDetails: {
-                source: usingRealAI ? 'real-ai' : 'mock-fallback',
+                source: 'real-ai-only',
                 processingTime: Date.now() - (analysisResult.startTime || Date.now())
             }
         };
 
-        // DEBUG: Log the actual response being sent to frontend
-        console.log('📤 SENDING TO FRONTEND:');
-        console.log('- Analysis clauses count:', analysisResult.analysis?.clauses?.length || 0);
-        console.log('- Analysis risks count:', analysisResult.analysis?.risks?.length || 0);
-        console.log('- Response structure:', JSON.stringify({
-            analysis: {
-                summary: analysisResult.analysis?.summary,
-                clausesCount: analysisResult.analysis?.clauses?.length,
-                risksCount: analysisResult.analysis?.risks?.length
-            }
-        }, null, 2));
-
-        // Include error details if AI failed
-        if (errorDetails && !usingRealAI) {
-            response.errorDetails = errorDetails;
-        }
-
+        // No error details needed since we only use real AI
         return createSuccessResponse(200, response);
 
     } catch (error) {
@@ -272,7 +346,6 @@ async function analyzeWithGemini(documentText) {
         const documentType = detectDocumentType(documentText);
         console.log(`🤖 Invoking Gemini model: ${GEMINI_MODEL}`);
         
-        // Use the Gemini client to analyze the document
         const result = await client.analyzeDocument(documentText, documentType);
         
         if (result.success) {
@@ -295,31 +368,12 @@ async function analyzeWithGemini(documentText) {
         const processingTime = Date.now() - startTime;
         console.error('Gemini analysis error:', error);
         
-        // Use error handler to determine if we should fallback
         const errorResponse = await geminiErrorHandler.handleError(error, { 
             documentText, 
             attempt: 0 
         });
         
-        if (errorResponse.shouldFallback) {
-            // Create fallback analysis
-            const fallbackResult = geminiErrorHandler.createFallbackAnalysis(
-                documentText, 
-                errorResponse.error, 
-                errorResponse.message
-            );
-            
-            return {
-                success: true, // Fallback is considered successful
-                analysis: fallbackResult.analysis,
-                confidence: fallbackResult.confidence,
-                startTime: startTime,
-                processingTime: processingTime,
-                fallbackUsed: true,
-                originalError: error.message
-            };
-        }
-        
+        // No fallback allowed - force real AI error
         return {
             success: false,
             error: error.message,
@@ -328,8 +382,6 @@ async function analyzeWithGemini(documentText) {
         };
     }
 }
-
-// Legacy functions removed - now using Gemini client classes
 
 /**
  * Detect document type based on content
@@ -353,81 +405,9 @@ function detectDocumentType(documentText) {
 }
 
 /**
- * Calculate analysis confidence score
+ * This function has been removed - no mock data allowed
+ * All analysis must use real Gemini AI
  */
-function calculateAnalysisConfidence(analysis) {
-    let score = 0;
-    if (analysis.summary?.documentType) score += 20;
-    if (analysis.clauses?.length >= 3) score += 30;
-    if (analysis.risks?.length >= 2) score += 25;
-    if (analysis.recommendations?.length >= 2) score += 15;
-    if (analysis.keyTerms?.length >= 2) score += 10;
-    return Math.min(score, 100);
-}
-
-/**
- * Generate mock analysis for fallback
- */
-function generateMockAnalysis(documentText) {
-    const documentType = detectDocumentType(documentText);
-    
-    return {
-        summary: {
-            documentType: documentType,
-            keyPurpose: "Document analysis and risk assessment",
-            mainParties: ["Party A", "Party B"],
-            effectiveDate: new Date().toISOString().split('T')[0],
-            expirationDate: null,
-            totalClausesIdentified: 4,
-            completenessScore: 85
-        },
-        clauses: [
-            {
-                id: "clause_1",
-                title: "Main Terms",
-                content: documentText.substring(0, Math.min(200, documentText.length)),
-                category: "general",
-                riskLevel: "medium",
-                explanation: "Primary terms and conditions of the agreement",
-                sourceLocation: "Document body",
-                keyTerms: ["terms", "conditions", "agreement"]
-            }
-        ],
-        risks: [
-            {
-                id: "risk_1",
-                title: "General Contract Risk",
-                description: "This agreement contains terms that require careful review",
-                severity: "medium",
-                category: "legal",
-                recommendation: "Review all terms with legal counsel",
-                clauseReference: "clause_1",
-                supportingText: "Various contract provisions"
-            }
-        ],
-        keyTerms: [
-            {
-                term: "Agreement",
-                definition: "The legal contract between the parties",
-                importance: "high",
-                context: "Throughout the document"
-            }
-        ],
-        recommendations: [
-            {
-                priority: "medium",
-                action: "Review all contract terms carefully",
-                rationale: "All contracts require thorough review",
-                affectedClauses: ["clause_1"]
-            }
-        ],
-        qualityMetrics: {
-            clauseDetectionConfidence: 75,
-            analysisCompleteness: 85,
-            potentialMissedClauses: ["specific_terms"]
-        }
-    };
-}
 
 /**
  * Extract text from S3 document using Textract
@@ -476,7 +456,6 @@ async function processDocumentComparison(requestBody) {
             return createErrorResponse(400, 'Invalid Request', 'At least 2 documents required for comparison');
         }
 
-        // For now, return a basic comparison response
         return createSuccessResponse(200, {
             comparison: {
                 overview: {
