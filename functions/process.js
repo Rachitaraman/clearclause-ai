@@ -1,36 +1,51 @@
 /**
- * ClearClause AI Backend Function - Clean Version
- * Handles document processing requests with AWS integration
+ * ClearClause AI Backend Function - Modular Extraction Services
+ * Handles document processing with specialized extractors for each input type
  */
 
-import { HybridDocumentProcessor } from './HybridDocumentProcessor.js'
-import { GeminiErrorHandler } from './ai/GeminiErrorHandler.js'
+import { ExtractionOrchestrator } from '../model/extractors/ExtractionOrchestrator.js'
+import { GeminiAnalyzer } from '../model/analyzers/GeminiAnalyzer.js'
 import dotenv from 'dotenv'
 
 // Load environment variables
 dotenv.config()
 
-// Initialize Hybrid Document Processor
-let hybridProcessor = null
-const geminiErrorHandler = new GeminiErrorHandler()
+// Initialize services
+let extractionOrchestrator = null
+let geminiAnalyzer = null
 
-function createHybridProcessor() {
-    if (!hybridProcessor) {
+function createExtractionOrchestrator() {
+    if (!extractionOrchestrator) {
         try {
-            hybridProcessor = new HybridDocumentProcessor()
+            extractionOrchestrator = new ExtractionOrchestrator()
         } catch (error) {
-            console.error('Failed to initialize Hybrid Document Processor:', error.message)
-            hybridProcessor = null
+            console.error('Failed to initialize Extraction Orchestrator:', error.message)
+            extractionOrchestrator = null
         }
     }
-    return hybridProcessor
+    return extractionOrchestrator
+}
+
+function createGeminiAnalyzer() {
+    if (!geminiAnalyzer) {
+        try {
+            geminiAnalyzer = new GeminiAnalyzer()
+        } catch (error) {
+            console.error('Failed to initialize Gemini Analyzer:', error.message)
+            geminiAnalyzer = null
+        }
+    }
+    return geminiAnalyzer
 }
 
 // Configuration constants
-const GEMINI_MODEL = process.env.VITE_GEMINI_MODEL || 'gemini-pro'
+const GEMINI_MODEL = process.env.VITE_GEMINI_MODEL || 'gemini-2.5-flash'
 
-console.log('🔧 Hybrid Configuration:')
-console.log('- Extraction Service: AWS (S3 + Textract)')
+console.log('🔧 Modular Extraction Configuration:')
+console.log('- Text Extraction: TextExtractor')
+console.log('- PDF Extraction: AWS Textract')
+console.log('- Image Extraction: AWS Textract OCR')
+console.log('- URL Extraction: URLExtractor')
 console.log('- Analysis Service: Google Gemini')
 console.log('- AI Model:', GEMINI_MODEL)
 
@@ -142,65 +157,94 @@ function handleDelete(query) {
 }
 
 /**
- * Process document analysis request using hybrid approach
+ * Process document analysis request using modular extraction services
  */
 async function processDocumentAnalysis(requestBody) {
     try {
-        const { documentText, documentType, filename, s3Key, fileBuffer } = requestBody;
+        const { documentText, documentType, filename, s3Key, fileBuffer, isImage, isPDF, url } = requestBody;
         
-        console.log('🚀 Starting hybrid document analysis...');
+        console.log('🚀 Starting modular document analysis...');
         
-        const processor = createHybridProcessor();
-        if (!processor) {
-            throw new Error('Hybrid processor not available');
+        const orchestrator = createExtractionOrchestrator();
+        if (!orchestrator) {
+            throw new Error('Extraction orchestrator not available');
         }
 
+        let extractionResult;
         let analysisResult;
         let usingRealAI = false;
         let errorDetails = null;
         
         try {
-            // Determine input type and process accordingly
-            let documentInput;
-            let options = { filename: filename || 'document' };
+            // Step 1: Extract text using appropriate service
+            console.log('📋 Step 1: Extracting text...');
             
-            if (s3Key) {
-                // Existing S3 document
-                options.s3Key = s3Key;
-                documentInput = null;
+            let input;
+            let inputFilename;
+
+            if (url) {
+                // URL input
+                input = url;
+                inputFilename = null;
             } else if (fileBuffer) {
-                // File buffer for upload
-                documentInput = Buffer.from(fileBuffer, 'base64');
+                // File buffer input
+                input = Buffer.from(fileBuffer, 'base64');
+                inputFilename = filename;
             } else if (documentText) {
-                // Direct text input
-                documentInput = documentText;
+                // Raw text input
+                input = documentText;
+                inputFilename = null;
             } else {
                 throw new Error('No valid document input provided');
             }
 
-            // Process with hybrid approach
-            const hybridResult = await processor.processDocument(documentInput, options);
-            
-            if (hybridResult.success) {
-                analysisResult = {
-                    success: true,
-                    analysis: hybridResult.analysis,
-                    confidence: hybridResult.metadata.confidence,
-                    startTime: Date.now() - hybridResult.metadata.processingTime,
-                    processingTime: hybridResult.metadata.processingTime,
-                    extractionMethod: hybridResult.extraction.method,
-                    extractionService: hybridResult.metadata.extractionService,
-                    analysisService: hybridResult.metadata.analysisService
-                };
-                usingRealAI = true;
-                console.log('✅ Hybrid processing completed successfully!');
-            } else {
-                throw new Error(hybridResult.error || 'Hybrid processing failed');
+            // Use orchestrator to route to appropriate extractor
+            extractionResult = await orchestrator.extract(input, inputFilename);
+
+            if (!extractionResult.success) {
+                throw new Error(`Extraction failed: ${extractionResult.error}`);
             }
+
+            console.log('✅ Text extraction successful');
+            console.log('   - Method:', extractionResult.metadata.extractionMethod);
+            console.log('   - Service:', extractionResult.metadata.extractionService);
+            console.log('   - Text length:', extractionResult.metadata.textLength);
+
+            // Step 2: Analyze extracted text with Gemini
+            console.log('📋 Step 2: Analyzing with Gemini...');
+            
+            const analyzer = createGeminiAnalyzer();
+            if (!analyzer) {
+                throw new Error('Gemini analyzer not available');
+            }
+
+            const analysisData = await analyzer.analyze(extractionResult.text, {
+                documentType: documentType || extractionResult.metadata.inputType,
+                filename: filename || 'document'
+            });
+
+            if (!analysisData.success) {
+                throw new Error(`Analysis failed: ${analysisData.error}`);
+            }
+
+            console.log('✅ Analysis successful');
+            console.log('   - Clauses found:', analysisData.analysis.clauses?.length || 0);
+            console.log('   - Risks found:', analysisData.analysis.risks?.length || 0);
+
+            analysisResult = {
+                success: true,
+                analysis: analysisData.analysis,
+                confidence: analysisData.confidence,
+                processingTime: analysisData.processingTime,
+                extractionMethod: extractionResult.metadata.extractionMethod,
+                extractionService: extractionResult.metadata.extractionService,
+                analysisService: 'Google Gemini'
+            };
+            usingRealAI = true;
             
         } catch (error) {
             errorDetails = error.message;
-            console.log('❌ Hybrid processing failed:', errorDetails);
+            console.log('❌ Processing failed:', errorDetails);
             
             // Fallback to mock data
             console.log('🔄 Falling back to enhanced mock analysis...');
@@ -215,7 +259,7 @@ async function processDocumentAnalysis(requestBody) {
             usingRealAI = false;
         }
 
-        // Enhanced response with hybrid processing details
+        // Enhanced response with modular extraction details
         const response = {
             analysis: analysisResult.analysis,
             confidence: analysisResult.confidence,
@@ -223,24 +267,25 @@ async function processDocumentAnalysis(requestBody) {
             model: usingRealAI ? GEMINI_MODEL : 'mock-analysis-enhanced',
             usingRealAI: usingRealAI,
             processingDetails: {
-                source: usingRealAI ? 'hybrid-processing' : 'mock-fallback',
+                source: usingRealAI ? 'modular-extraction' : 'mock-fallback',
                 extractionService: analysisResult.extractionService || 'Unknown',
                 analysisService: analysisResult.analysisService || 'Unknown',
                 extractionMethod: analysisResult.extractionMethod || 'unknown',
                 processingTime: analysisResult.processingTime || 0,
-                hybrid: usingRealAI
+                modular: usingRealAI
             }
         };
 
         // DEBUG: Log the actual response being sent to frontend
-        console.log('📤 HYBRID RESPONSE TO FRONTEND:');
+        console.log('📤 MODULAR RESPONSE TO FRONTEND:');
         console.log('- Using Real AI:', response.usingRealAI);
         console.log('- Extraction Service:', response.processingDetails.extractionService);
         console.log('- Analysis Service:', response.processingDetails.analysisService);
+        console.log('- Extraction Method:', response.processingDetails.extractionMethod);
         console.log('- Clauses found:', response.analysis?.clauses?.length || 0);
         console.log('- Risks found:', response.analysis?.risks?.length || 0);
 
-        // Include error details if hybrid processing failed
+        // Include error details if processing failed
         if (errorDetails && !usingRealAI) {
             response.errorDetails = errorDetails;
         }
